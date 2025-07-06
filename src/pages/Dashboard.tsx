@@ -50,6 +50,8 @@ const Dashboard: React.FC = () => {
   const [dataLoading, setDataLoading] = useState(false);
   const [lastRecommendation, setLastRecommendation] = useState<string>('');
   const [lastSignal, setLastSignal] = useState<any>(null);
+  const [lastSchool, setLastSchool] = useState<string>('');
+  const [lastTimestamp, setLastTimestamp] = useState<Date | null>(null);
   const [error, setError] = useState('');
   const [marketData, setMarketData] = useState<any>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -325,6 +327,11 @@ ${jsonData}`;
 
     setLoading(true);
     setError('');
+    // Clear previous results
+    setLastRecommendation('');
+    setLastSignal(null);
+    setLastSchool('');
+    setLastTimestamp(null);
 
     try {
       const school = schools.find(s => s.id === selectedSchool);
@@ -366,13 +373,18 @@ ${jsonData}`;
         signal: result.signal
       });
       
-      // Update state with the results
+      // Update state with the results - THIS IS THE KEY FIX
+      const currentTimestamp = new Date();
       setLastRecommendation(result.analysis);
       setLastSignal(result.signal);
+      setLastSchool(school.name);
+      setLastTimestamp(currentTimestamp);
       
-      console.log('Analysis saved successfully:', {
+      console.log('Analysis saved and state updated successfully:', {
         analysis: result.analysis.substring(0, 100) + '...',
-        signal: result.signal
+        signal: result.signal,
+        school: school.name,
+        timestamp: currentTimestamp
       });
 
       // Scroll to analysis section after it's rendered
@@ -843,7 +855,7 @@ ${jsonData}`;
           </div>
         </div>
 
-        {/* Analysis Display */}
+        {/* Analysis Display - THIS IS THE KEY SECTION */}
         {(lastRecommendation || lastSignal) && (
           <div className="mt-8" ref={analysisRef}>
             <h2 className="text-2xl font-bold text-white mb-4 flex items-center space-x-2">
@@ -853,8 +865,8 @@ ${jsonData}`;
             <AnalysisDisplay
               analysis={lastRecommendation}
               signal={lastSignal}
-              school={schools.find(s => s.id === selectedSchool)?.name || 'Unknown'}
-              timestamp={new Date()}
+              school={lastSchool}
+              timestamp={lastTimestamp}
               onSendToTelegram={user?.plan === 'elite' && telegramConfig ? handleSendToTelegram : undefined}
             />
           </div>
