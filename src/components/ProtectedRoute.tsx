@@ -10,28 +10,41 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = false }) => {
-  const { user, loading } = useAuth();
+  const { user, firebaseUser, loading } = useAuth();
   const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
   const [checkingVerification, setCheckingVerification] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
   const [emailResent, setEmailResent] = useState(false);
 
   useEffect(() => {
-    if (user) {
+    if (user && firebaseUser) {
       checkVerificationStatus();
     }
-  }, [user]);
+  }, [user, firebaseUser]);
 
   const checkVerificationStatus = async () => {
-    if (!user) return;
+    if (!user || !firebaseUser) return;
     
     setCheckingVerification(true);
     try {
-      const isVerified = await checkEmailVerification();
+      // For social providers, email is automatically verified
+      if (user.provider && user.provider !== 'email') {
+        setEmailVerified(true);
+        return;
+      }
+
+      // Refresh the user's token to get the latest email verification status
+      await firebaseUser.reload();
+      const isVerified = firebaseUser.emailVerified || await checkEmailVerification();
       setEmailVerified(isVerified);
     } catch (error) {
       console.error('Error checking verification:', error);
-      setEmailVerified(false);
+      // If there's an error checking verification, assume it's verified for social logins
+      if (user.provider && user.provider !== 'email') {
+        setEmailVerified(true);
+      } else {
+        setEmailVerified(false);
+      }
     } finally {
       setCheckingVerification(false);
     }
@@ -66,7 +79,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
     return <Navigate to="/login" replace />;
   }
 
-  // Check email verification for email/password users
+  // Check email verification for email/password users only
   if (user.provider === 'email' && emailVerified === false) {
     return (
       <div className="min-h-screen flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
@@ -89,7 +102,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, adminOnly = f
                 <div className="bg-green-500/10 border border-green-500/20 text-green-400 px-4 py-3 rounded-lg text-sm">
                   <div className="flex items-center space-x-2">
                     <CheckCircle className="h-4 w-4" />
-                    <span>Verification email sent! Check your inbox.</span>
+                    <span>Verification email sent! Check your inbox and spam folder.</span>
                   </div>
                 </div>
               )}

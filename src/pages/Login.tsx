@@ -29,11 +29,22 @@ const Login: React.FC = () => {
     } catch (error: any) {
       console.error('❌ Login error:', error);
       
-      if (error.message.includes('verify your email')) {
+      // Handle specific Firebase Auth error codes
+      if (error.code === 'auth/invalid-credential') {
+        setError('Invalid email or password. Please check your credentials and try again.');
+      } else if (error.code === 'auth/user-not-found') {
+        setError('No account found with this email address. Please check your email or sign up for a new account.');
+      } else if (error.code === 'auth/wrong-password') {
+        setError('Incorrect password. Please try again.');
+      } else if (error.code === 'auth/too-many-requests') {
+        setError('Too many failed login attempts. Please try again later or reset your password.');
+      } else if (error.code === 'auth/user-disabled') {
+        setError('This account has been disabled. Please contact support.');
+      } else if (error.message && error.message.includes('verify your email')) {
         setVerificationError(true);
         setError('Email verification required. Please check your inbox and click the verification link.');
       } else {
-        setError(error.message || 'Failed to login');
+        setError(error.message || 'Failed to login. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -41,6 +52,11 @@ const Login: React.FC = () => {
   };
 
   const handleResendVerification = async () => {
+    if (!email) {
+      setError('Please enter your email address first.');
+      return;
+    }
+
     setResendingEmail(true);
     setError('');
     setEmailResent(false);
@@ -50,24 +66,39 @@ const Login: React.FC = () => {
       setEmailResent(true);
       setError('');
     } catch (error: any) {
-      setError(error.message || 'Failed to resend verification email');
+      console.error('Error resending verification:', error);
+      if (error.code === 'auth/user-not-found') {
+        setError('No account found with this email address.');
+      } else if (error.code === 'auth/too-many-requests') {
+        setError('Too many requests. Please wait before requesting another verification email.');
+      } else {
+        setError(error.message || 'Failed to resend verification email');
+      }
     } finally {
       setResendingEmail(false);
     }
   };
 
   const handleCheckVerification = async () => {
+    if (!email) {
+      setError('Please enter your email address first.');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
     try {
       const isVerified = await checkEmailVerification();
       if (isVerified) {
+        // Try to login again after verification
+        await loginUser(email, password);
         navigate('/dashboard');
       } else {
         setError('Email is still not verified. Please check your inbox and click the verification link.');
       }
     } catch (error: any) {
+      console.error('Error checking verification:', error);
       setError(error.message || 'Failed to check verification status');
     } finally {
       setLoading(false);
@@ -116,11 +147,7 @@ const Login: React.FC = () => {
                   : 'bg-red-500/10 border-red-500/20 text-red-400'
               }`}>
                 <div className="flex items-start space-x-2">
-                  {verificationError ? (
-                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                  )}
+                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <span>{error}</span>
                 </div>
               </div>
@@ -130,7 +157,7 @@ const Login: React.FC = () => {
               <div className="bg-green-500/10 border border-green-500/20 text-green-400 px-4 py-3 rounded-lg text-sm">
                 <div className="flex items-center space-x-2">
                   <CheckCircle className="h-4 w-4" />
-                  <span>Verification email sent! Check your inbox.</span>
+                  <span>Verification email sent! Check your inbox and spam folder.</span>
                 </div>
               </div>
             )}
@@ -194,23 +221,23 @@ const Login: React.FC = () => {
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
                   <h3 className="text-blue-400 font-semibold mb-2 text-sm">Email Verification Required</h3>
                   <p className="text-gray-300 text-xs mb-3">
-                    To access your dashboard, please verify your email address by clicking the link we sent to your inbox.
+                    To access your dashboard, please verify your email address by clicking the link we sent to your inbox. Don't forget to check your spam/junk folder.
                   </p>
                   <div className="space-y-2">
                     <button
                       type="button"
                       onClick={handleCheckVerification}
-                      disabled={loading}
+                      disabled={loading || !email || !password}
                       className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium transition-all disabled:opacity-50 text-sm flex items-center justify-center space-x-2"
                     >
                       <CheckCircle className="h-4 w-4" />
-                      <span>I've Verified My Email</span>
+                      <span>{loading ? 'Checking...' : 'I\'ve Verified My Email'}</span>
                     </button>
                     
                     <button
                       type="button"
                       onClick={handleResendVerification}
-                      disabled={resendingEmail}
+                      disabled={resendingEmail || !email}
                       className="w-full bg-white/10 hover:bg-white/20 text-white py-2 px-4 rounded-lg font-medium transition-all disabled:opacity-50 border border-white/20 text-sm flex items-center justify-center space-x-2"
                     >
                       <RefreshCw className={`h-4 w-4 ${resendingEmail ? 'animate-spin' : ''}`} />

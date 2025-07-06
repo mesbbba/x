@@ -36,15 +36,31 @@ const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({ onError, loadin
       if (error.code === 'auth/popup-closed-by-user') {
         onError('Sign-in was cancelled. Please try again.');
       } else if (error.code === 'auth/popup-blocked') {
-        onError('Popup was blocked by your browser. Please allow popups and try again.');
+        onError('Popup was blocked by your browser. Please allow popups for this site and try again. You can usually do this by clicking the popup blocker icon in your browser\'s address bar.');
       } else if (error.code === 'auth/account-exists-with-different-credential') {
-        onError('An account already exists with the same email address but different sign-in credentials.');
+        onError('An account already exists with the same email address but different sign-in credentials. Please try signing in with your original method.');
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        onError('Another sign-in popup is already open. Please close it and try again.');
+      } else if (error.code === 'auth/network-request-failed') {
+        onError('Network error. Please check your internet connection and try again.');
+      } else if (error.code === 'auth/unauthorized-domain') {
+        onError('This domain is not authorized for OAuth operations. Please contact support.');
       } else {
-        onError(error.message || `Failed to sign in with ${provider}`);
+        onError(error.message || `Failed to sign in with ${provider}. Please try again.`);
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePopupBlocked = (provider: 'google' | 'facebook') => {
+    onError(`It looks like popups are blocked for this site. To sign in with ${provider}:
+    
+1. Look for a popup blocker icon in your browser's address bar
+2. Click it and select "Always allow popups from this site"
+3. Try signing in again
+    
+Alternatively, you can disable popup blocking temporarily in your browser settings.`);
   };
 
   return (
@@ -89,6 +105,11 @@ const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({ onError, loadin
           </svg>
           Facebook
         </button>
+      </div>
+
+      {/* Popup blocker help text */}
+      <div className="text-xs text-gray-400 text-center">
+        <p>Having trouble? Make sure popups are enabled for this site.</p>
       </div>
     </div>
   );

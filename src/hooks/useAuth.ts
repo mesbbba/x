@@ -14,6 +14,9 @@ export const useAuth = () => {
       setFirebaseUser(firebaseUser);
       if (firebaseUser) {
         try {
+          // Force refresh the ID token to ensure authentication context is fully established
+          await firebaseUser.getIdTokenResult(true);
+          
           // Set up real-time listener for user data
           const unsubscribeUser = onSnapshot(
             doc(db, 'users', firebaseUser.uid), 
@@ -41,7 +44,8 @@ export const useAuth = () => {
                   isAdmin: userData.isAdmin || false,
                   plan: planType || 'free',
                   used_today: userData.used_today || 0,
-                  recommendation_limit: userData.recommendation_limit || 1
+                  recommendation_limit: userData.recommendation_limit || 1,
+                  provider: userData.provider || 'email'
                 } as User);
               } else {
                 // User document doesn't exist in Firestore
@@ -54,8 +58,21 @@ export const useAuth = () => {
               console.error('Error listening to user document:', error);
               if (error.code === 'permission-denied') {
                 console.warn('Permission denied accessing user document. User may need to be authenticated or Firestore rules may need adjustment.');
+                // For permission errors, we'll still create a basic user object from Firebase Auth
+                setUser({
+                  uid: firebaseUser.uid,
+                  displayName: firebaseUser.displayName || '',
+                  email: firebaseUser.email || '',
+                  photoURL: firebaseUser.photoURL || '',
+                  isAdmin: false,
+                  plan: 'free',
+                  used_today: 0,
+                  recommendation_limit: 1,
+                  provider: 'email'
+                } as User);
+              } else {
+                setUser(null);
               }
-              setUser(null);
               setLoading(false);
             }
           );
@@ -65,7 +82,18 @@ export const useAuth = () => {
           };
         } catch (error) {
           console.error('Error fetching user data:', error);
-          setUser(null);
+          // Even if there's an error, create a basic user object from Firebase Auth
+          setUser({
+            uid: firebaseUser.uid,
+            displayName: firebaseUser.displayName || '',
+            email: firebaseUser.email || '',
+            photoURL: firebaseUser.photoURL || '',
+            isAdmin: false,
+            plan: 'free',
+            used_today: 0,
+            recommendation_limit: 1,
+            provider: 'email'
+          } as User);
           setLoading(false);
         }
       } else {
